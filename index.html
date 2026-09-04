@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Tablero de Oportunidades</title>
+<link rel="stylesheet" href="css/styles.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ===================== HOME ===================== -->
+<div id="home" class="home">
+  <div class="home-inner">
+    <div class="home-head">
+      <div class="logo-lg">▦</div>
+      <h1>Herramientas de Pipeline</h1>
+      <p>Elige un módulo para empezar.</p>
+    </div>
+    <div class="home-cards">
+      <button class="home-card" data-go="pipeline">
+        <div class="hc-ico">🧹</div>
+        <div class="hc-t">Limpieza de pipeline</div>
+        <div class="hc-d">Filtra oportunidades por fechas, stage, plataforma, BP y cliente. Detecta registros vencidos y exporta a Excel.</div>
+        <div class="hc-go">Abrir →</div>
+      </button>
+      <button class="home-card" data-go="partnumbers">
+        <div class="hc-ico">🔢</div>
+        <div class="hc-t">Lista de Part Numbers</div>
+        <div class="hc-d">Carga tu lista de part numbers y consúltala: busca en cualquier columna, ordena y exporta.</div>
+        <div class="hc-go">Abrir →</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MÓDULO 1: LIMPIEZA DE PIPELINE ===================== -->
+<div id="mod-pipeline" class="module" style="display:none">
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="brand">
+      <button class="btn back" data-go="home">← Módulos</button>
+      <div class="logo">🧹</div>
+      <div>
+        <h1>Reporte Oportunidades</h1>
+        <p class="sub" id="srcinfo">Sin datos cargados.</p>
+      </div>
+    </div>
+    <div class="source">
+      <div class="drop2" id="drop">⬆ Cargar Excel o CSV</div>
+      <input type="file" id="file" accept=".csv,.xlsx,.xls,text/csv" style="display:none"/>
+    </div>
+  </header>
+
+  <div class="cards">
+    <div class="card"><div class="lbl">Oportunidades</div><div class="num" id="m-count">0</div></div>
+    <div class="card"><div class="lbl">Valor estimado</div><div class="num" id="m-val">$0</div></div>
+    <div class="card"><div class="lbl">Valor promedio</div><div class="num" id="m-avg">$0</div></div>
+    <div class="card alert" id="card-exp" style="cursor:pointer" title="Clic para ver solo los vencidos"><div class="lbl">Registro vencido ▸</div><div class="num" id="m-exp">0</div></div>
+  </div>
+
+  <div class="qbar">
+    <button class="btn" id="togglefilters">Mostrar filtros ▾</button>
+    <div class="fld"><label>Trimestre</label>
+      <select id="qs">
+        <option value="1">Q1 · Ene–Mar</option>
+        <option value="2">Q2 · Abr–Jun</option>
+        <option value="3">Q3 · Jul–Sep</option>
+        <option value="4">Q4 · Oct–Dic</option>
+      </select>
+    </div>
+    <div class="fld"><label>Año</label><select id="qy"></select></div>
+    <button class="btn primary" id="preset">Aplicar</button>
+    <button class="btn" id="venc">Ver vencidos</button>
+    <button class="btn" id="reset">Limpiar</button>
+  </div>
+
+  <div class="panel" id="panel" style="display:none">
+    <div class="row">
+      <div class="fld" style="flex:1;min-width:200px">
+        <label>Buscar (cliente, oportunidad, número)</label>
+        <input type="text" id="q" placeholder="Banco, SRI, CP4BA..." style="max-width:none"/>
+      </div>
+      <div class="fld"><label>Business Partner</label><select id="bp"></select></div>
+      <div class="fld" style="position:relative"><label>Cliente</label>
+        <button type="button" class="btn ms-btn" id="cl-btn">Todos los clientes ▾</button>
+        <div class="ms-pop" id="cl-pop" hidden>
+          <input type="text" id="cl-search" placeholder="Buscar cliente..."/>
+          <div class="ms-actions"><button id="cl-all">Todos</button><button id="cl-none">Ninguno</button></div>
+          <div class="ms-list" id="cl-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <div class="fld"><label>Close — desde</label><input type="date" id="cf"/></div>
+      <div class="fld"><label>Close — hasta</label><input type="date" id="ct"/></div>
+      <div class="fld"><label>Expiry — desde</label><input type="date" id="ef"/></div>
+      <div class="fld"><label>Expiry — hasta</label><input type="date" id="et"/></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="fld" style="flex:1"><label>Stage</label><div class="chips" id="stages"></div></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="fld" style="flex:1"><label>Plataforma (Platform type)</label><div class="chips" id="plats"></div></div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex:0 0 auto">
+    <div class="meta" id="meta"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="copybtn">Copiar tabla</button>
+      <button class="btn primary" id="exportbtn">Exportar Excel</button>
+    </div>
+  </div>
+  <div class="tcontain">
+    <table>
+      <thead><tr>
+        <th data-k="cust">Cliente <span class="ar"></span></th>
+        <th data-k="opp">Oportunidad <span class="ar"></span></th>
+        <th data-k="bp">Business Partner <span class="ar"></span></th>
+        <th data-k="stage">Stage <span class="ar"></span></th>
+        <th data-k="plat">Plataforma <span class="ar"></span></th>
+        <th data-k="val" class="r">Valor (USD) <span class="ar"></span></th>
+        <th data-k="close">Close date <span class="ar"></span></th>
+        <th data-k="exp">Expiry date <span class="ar"></span></th>
+        <th data-k="owner">Owner <span class="ar"></span></th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-ctrl">
+      <div class="fld"><label></br>Agrupar por</label>
+        <select id="ch-group">
+          <option value="month">Mes</option>
+          <option value="quarter">Trimestre</option>
+          <option value="year">Año</option>
+          <option value="bp">Business Partner</option>
+        </select>
+      </div>
+      <div class="fld" id="ch-date-wrap"><label>Fecha base</label>
+        <select id="ch-date">
+          <option value="close">Close date</option>
+          <option value="exp">Expiry date</option>
+        </select>
+      </div>
+      <div class="fld"><label>Métrica</label>
+        <select id="ch-metric">
+          <option value="val">Valor (USD)</option>
+          <option value="count">Cantidad</option>
+        </select>
+      </div>
+    </div>
+    <div class="chart-wrap" id="ch-wrap" style="height:220px"><canvas id="ch-canvas"></canvas></div>
+  </div>
+
+</div>
+</div><!-- /mod-pipeline -->
+
+<!-- ===================== MÓDULO 2: LISTA DE PART NUMBERS ===================== -->
+<div id="mod-partnumbers" class="module" style="display:none">
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand">
+      <button class="btn back" data-go="home">← Módulos</button>
+      <div class="logo">🔢</div>
+      <div>
+        <h1>Lista de Part Numbers</h1>
+        <p class="sub" id="pn-srcinfo">Sin datos cargados.</p>
+      </div>
+    </div>
+    <div class="source">
+      <div class="drop2" id="pn-drop">⬆ Cargar Excel o CSV</div>
+      <input type="file" id="pn-file" accept=".csv,.xlsx,.xls,text/csv" style="display:none"/>
+    </div>
+  </header>
+  <div class="cards" style="grid-template-columns:repeat(3,minmax(0,200px))">
+    <div class="card"><div class="lbl">Part Numbers</div><div class="num" id="pn-count">0</div></div>
+    <div class="card"><div class="lbl">Columnas</div><div class="num" id="pn-cols">0</div></div>
+    <div class="card"><div class="lbl">Mostrando</div><div class="num" id="pn-shown">0</div></div>
+  </div>
+  <div class="toolbar2">
+    <input type="text" id="pn-q" placeholder="Buscar en cualquier columna (part number, descripción, etc.)"/>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="pn-copy">Copiar tabla</button>
+      <button class="btn primary" id="pn-export">Exportar Excel</button>
+    </div>
+  </div>
+  <div class="meta" id="pn-meta"></div>
+  <div class="tcontain">
+    <table><thead id="pn-head"></thead><tbody id="pn-tb"></tbody></table>
+  </div>
+</div>
+</div><!-- /mod-partnumbers -->
+
+<!-- modal detalle -->
+<div id="det-ov" class="modal-ov" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <div class="modal-hd-left">
+        <span id="det-badge" style="display:none;align-self:flex-start"></span>
+        <h2 id="det-title"></h2>
+      </div>
+      <button class="modal-x" id="det-close">✕</button>
+    </div>
+    <div id="det-actions" style="display:none;padding:14px 24px 4px">
+      <a id="det-link" href="#" target="_blank" rel="noopener noreferrer" class="btn primary det-link-btn">Ver en IBM Partner Portal ↗</a>
+    </div>
+    <div class="detail-pairs" id="det-body"></div>
+  </div>
+</div>
+
+<script src="js/detail-modal.js"></script>
+<script src="js/pipeline.js"></script>
+<script src="js/partnumbers.js"></script>
+<script src="js/router.js"></script>
+</body>
+</html>
